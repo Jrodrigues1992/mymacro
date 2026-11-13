@@ -1,4 +1,18 @@
-<!doctype html>
+function applyRecorded(strokes){
+  if (!editing){
+    try { var dr = JSON.parse(localStorage.getItem('draft')||'null'); if (dr){ editing = dr.m; isNew = dr.isNew; recordIdx = dr.idx; } } catch(e){}
+  }
+  if (editing && editing.actions[recordIdx]){
+    editing.actions[recordIdx].strokes = strokes;
+    recordIdx = -1;
+    renderEditor();
+    toast(strokes.length + ' toque(s) gravado(s). Toque em Salvar.');
+  }
+}
+try { if (Macro.addListener) Macro.addListener('recorded', function(d){
+  var strokes = []; try { strokes = JSON.parse(d.strokes || '[]'); } catch(e){}
+  applyRecorded(strokes);
+}); } catch(e){}<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -50,7 +64,7 @@ label{display:block;font-size:13px;color:var(--mut);margin-top:10px}
 <body>
 <header>
   <button id="back" class="hide">&larr;</button>
-  <h1 id="ttl">MyMacro</h1><span style="font-size:11px;opacity:.7">v2</span>
+  <h1 id="ttl">MyMacro</h1><span style="font-size:11px;opacity:.7">v3</span>
   <button id="bPerm">Permiss&otilde;es</button>
   <button id="bLog">Hist&oacute;rico</button>
 </header>
@@ -67,7 +81,10 @@ window.addEventListener('unhandledrejection',function(e){var b=document.getEleme
 'use strict';
 var NATIVE = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
 var Macro;
-if (NATIVE) { Macro = Capacitor.registerPlugin('Macro'); }
+if (NATIVE) {
+  Macro = (typeof Capacitor.registerPlugin === 'function') ? Capacitor.registerPlugin('Macro') : (Capacitor.Plugins && Capacitor.Plugins.Macro);
+  if (!Macro) { window.addEventListener('DOMContentLoaded', function(){ var b=document.getElementById('err'); b.classList.remove('hide'); b.textContent='Plugin nativo Macro não encontrado.'; }); Macro = {}; }
+}
 else {
   // Modo de teste no navegador (sem Android)
   var ls = function(k,d){ try{ return localStorage.getItem(k) || d; }catch(e){ return d; } };
@@ -339,7 +356,7 @@ document.addEventListener('change', async function(ev){
   }
 });
 
-try { Macro.addListener('recorded', function(d){
+try { if (Macro.addListener) Macro.addListener('recorded', function(d){
   var strokes = []; try { strokes = JSON.parse(d.strokes || '[]'); } catch(e){}
   if (!editing){
     try { var dr = JSON.parse(localStorage.getItem('draft')||'null'); if (dr){ editing = dr.m; isNew = dr.isNew; recordIdx = dr.idx; } } catch(e){}
@@ -351,7 +368,19 @@ try { Macro.addListener('recorded', function(d){
   }
 }); } catch(e){}
 
-document.addEventListener('visibilitychange', function(){ if(!document.hidden && view==='perm') showPerms(); });
+async function takeRecorded(){
+  if (!Macro.takeRecorded) return;
+  try {
+    var r = await T(Macro.takeRecorded()); var j = (r && r.json) || '';
+    if (j) applyRecorded(JSON.parse(j));
+  } catch(e){}
+}
+document.addEventListener('visibilitychange', function(){
+  if (document.hidden) return;
+  if (view==='perm') showPerms();
+  if (recordIdx >= 0) takeRecorded();
+});
+window.addEventListener('focus', function(){ if (recordIdx >= 0) takeRecorded(); });
 
 renderList();
 loadAll().then(renderList);
