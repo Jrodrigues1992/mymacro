@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>MyMacro</title>
+<style>
+:root{--bg:#f4f5fb;--card:#fff;--tx:#1b1d2a;--mut:#6b7090;--pri:#4f46e5;--pri2:#eef0ff;--red:#d93a3a;--ok:#1f9d55;--bd:#e2e4f0}
+@media(prefers-color-scheme:dark){:root{--bg:#12131c;--card:#1c1e2b;--tx:#eceef9;--mut:#9aa0c2;--pri:#8b87ff;--pri2:#26294a;--red:#ff6b6b;--ok:#4cd08a;--bd:#2c2f45}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,sans-serif;padding-bottom:90px}
+header{position:sticky;top:0;z-index:5;background:var(--pri);color:#fff;padding:calc(env(safe-area-inset-top) + 14px) 16px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:20px;margin:0;flex:1}
+header button{background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:10px;padding:8px 12px;font-size:14px}
+main{padding:14px;max-width:640px;margin:auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+.row{display:flex;align-items:center;gap:10px}
+.grow{flex:1;min-width:0}
+.title{font-weight:600}
+.sub{color:var(--mut);font-size:13px}
+button{font:inherit}
+.btn{background:var(--pri);color:#fff;border:0;border-radius:12px;padding:11px 16px;font-weight:600}
+.btn.sec{background:var(--pri2);color:var(--pri)}
+.btn.red{background:transparent;color:var(--red);border:1px solid var(--red)}
+.btn.sm{padding:7px 11px;font-size:14px;border-radius:10px}
+.fab{position:fixed;right:18px;bottom:calc(env(safe-area-inset-bottom) + 18px);padding:15px 20px;border-radius:30px;box-shadow:0 6px 18px rgba(79,70,229,.45)}
+input,select,textarea{width:100%;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:10px;margin-top:4px}
+label{display:block;font-size:13px;color:var(--mut);margin-top:10px}
+.sw{position:relative;width:48px;height:28px;flex:none}
+.sw input{opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;z-index:2}
+.sw i{position:absolute;inset:0;background:#b9bcd3;border-radius:20px;transition:.2s}
+.sw i:after{content:"";position:absolute;width:22px;height:22px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.sw input:checked+i{background:var(--ok)}
+.sw input:checked+i:after{transform:translateX(20px)}
+.days{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.days label{margin:0;display:flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--bd);border-radius:20px;padding:6px 10px;font-size:14px;color:var(--tx)}
+.days input{width:auto;margin:0}
+.act{border-left:4px solid var(--pri);padding-left:10px;margin:10px 0}
+.pill{display:inline-block;font-size:12px;border-radius:20px;padding:2px 9px;background:var(--pri2);color:var(--pri);margin-right:4px}
+.ok{color:var(--ok)}.no{color:var(--red)}
+.empty{text-align:center;color:var(--mut);padding:40px 10px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20;display:flex;align-items:flex-end}
+.modal>div{background:var(--card);width:100%;max-height:80vh;overflow:auto;border-radius:18px 18px 0 0;padding:14px}
+.app{padding:11px 4px;border-bottom:1px solid var(--bd)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:90px;background:#222;color:#fff;padding:10px 16px;border-radius:12px;z-index:30;max-width:90%}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <button id="back" class="hide">&larr;</button>
+  <h1 id="ttl">MyMacro</h1>
+  <button id="bPerm">Permiss&otilde;es</button>
+  <button id="bLog">Hist&oacute;rico</button>
+</header>
+<main id="main"></main>
+<button class="btn fab" id="fab">+ Nova macro</button>
+<div id="toast" class="toast hide"></div>
+<div id="modal" class="modal hide"><div id="modalBody"></div></div>
+
+<script>
+(function(){
+'use strict';
+var NATIVE = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
+var Macro;
+if (NATIVE) { Macro = Capacitor.registerPlugin('Macro'); }
+else {
+  // Modo de teste no navegador (sem Android)
+  var ls = function(k,d){ try{ return localStorage.getItem(k) || d; }catch(e){ return d; } };
+  Macro = {
+    getStatus: async function(){ return {accessibility:false,overlay:false,notifications:true,sms:false,bluetooth:true,battery:false,service:true}; },
+    askPermissions: async function(){}, openSettings: async function(){},
+    saveMacros: async function(o){ try{ localStorage.setItem('macros', o.json); }catch(e){} },
+    loadMacros: async function(){ return {json: ls('macros','[]')}; },
+    getLog: async function(){ return {json: ls('log','[]')}; },
+    clearLog: async function(){ try{ localStorage.setItem('log','[]'); }catch(e){} },
+    runMacro: async function(){}, startRecording: async function(){ throw new Error('Só funciona no Android.'); },
+    listApps: async function(){ return {json: JSON.stringify([{name:'Calculadora',pkg:'com.calc'},{name:'WhatsApp',pkg:'com.whatsapp'},{name:'Chrome',pkg:'com.chrome'}])}; },
+    addListener: function(){ return {remove:function(){}}; }
+  };
+}
+
+var TRIGGERS = {
+  time:['Em um horário'], charger_on:['Carregador conectado'], charger_off:['Carregador desconectado'],
+  battery_below:['Bateria abaixo de um nível'], wifi_on:['Wi-Fi conectado'], wifi_off:['Wi-Fi desconectado'],
+  bt_on:['Bluetooth conectado'], bt_off:['Bluetooth desconectado']
+};
+var ACTIONS = {
+  notify:'Mostrar notificação', open_app:'Abrir um app', open_url:'Abrir um link', sms:'Enviar SMS',
+  vibrate:'Vibrar', flashlight:'Lanterna', ringer:'Modo de som', settings:'Abrir painel de Wi-Fi/Bluetooth',
+  wait:'Esperar', taps:'Repetir toques gravados'
+};
+var DAYS = [[2,'Seg'],[3,'Ter'],[4,'Qua'],[5,'Qui'],[6,'Sex'],[7,'Sáb'],[1,'Dom']];
+
+var macros = [], editing = null, isNew = false, view = 'list', recordIdx = -1;
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function uid(){ return 'm' + Date.now().toString(36) + Math.floor(Math.random()*1e5).toString(36); }
+function toast(t){ var e=$('toast'); e.textContent=t; e.classList.remove('hide'); clearTimeout(toast.t); toast.t=setTimeout(function(){ e.classList.add('hide'); },3200); }
+function pad(n){ return (n<10?'0':'')+n; }
+
+async function loadAll(){
+  try { var r = await Macro.loadMacros(); macros = JSON.parse(r.json || '[]'); } catch(e){ macros = []; }
+}
+async function persist(){
+  try { await Macro.saveMacros({json: JSON.stringify(macros)}); } catch(e){ toast('Erro ao salvar: ' + e.message); }
+}
+
+function trigText(t){
+  if(!t) return '';
+  var s = (TRIGGERS[t.type]||[t.type])[0];
+  if (t.type==='time'){
+    s = 'Às ' + pad(t.hour||0) + ':' + pad(t.minute||0);
+    var d = t.days||[];
+    if (d.length && d.length<7) s += ' (' + DAYS.filter(function(x){return d.indexOf(x[0])>=0;}).map(function(x){return x[1];}).join(', ') + ')'; else s += ' (todos os dias)';
+  } else if (t.type==='battery_below') s = 'Bateria chegar a ' + (t.level||20) + '% ou menos';
+  else if ((t.type==='bt_on'||t.type==='bt_off') && t.device) s += ': ' + t.device;
+  return s;
+}
+function actText(a){
+  switch(a.type){
+    case 'notify': return 'Notificação: ' + (a.title||'') + (a.text?' – '+a.text:'');
+    case 'open_app': return 'Abrir ' + (a.label||a.pkg||'(escolha um app)');
+    case 'open_url': return 'Abrir ' + (a.url||'');
+    case 'sms': return 'SMS para ' + (a.number||'?');
+    case 'vibrate': return 'Vibrar ' + (a.ms||500) + ' ms';
+    case 'flashlight': return 'Lanterna: ' + ({on:'ligar',off:'desligar',toggle:'alternar'}[a.mode||'toggle']);
+    case 'ringer': return 'Som: ' + ({normal:'normal',vibrate:'vibrar',silent:'silencioso'}[a.mode||'normal']);
+    case 'settings': return 'Abrir painel de ' + (a.target==='bluetooth'?'Bluetooth':'Wi-Fi');
+    case 'wait': return 'Esperar ' + ((a.ms||1000)/1000) + ' s';
+    case 'taps': return 'Repetir ' + ((a.strokes||[]).length) + ' toque(s) gravado(s)';
+  }
+  return a.type;
+}
+
+function setView(v, title){
+  view = v; $('ttl').textContent = title || 'MyMacro';
+  $('back').classList.toggle('hide', v==='list');
+  $('fab').classList.toggle('hide', v!=='list');
+  $('bPerm').classList.toggle('hide', v!=='list');
+  $('bLog').classList.toggle('hide', v!=='list');
+}
+
+function renderList(){
+  setView('list','MyMacro');
+  var h = '';
+  if (!macros.length) h = '<div class="empty"><div style="font-size:42px">&#9881;</div><p><b>Nenhuma macro ainda</b></p><p>Toque em <b>+ Nova macro</b> para criar sua primeira rotina: &ldquo;quando acontecer X, fa&ccedil;a Y&rdquo;.</p></div>';
+  macros.forEach(function(m,i){
+    h += '<div class="card"><div class="row"><div class="grow" data-edit="'+i+'"><div class="title">'+esc(m.name||'Sem nome')+'</div>' +
+      '<div class="sub">Quando: '+esc(trigText(m.trigger))+'</div><div class="sub">'+(m.actions||[]).length+' ação(ões)</div></div>' +
+      '<button class="btn sec sm" data-run="'+i+'">&#9654; Testar</button>' +
+      '<label class="sw" style="margin:0"><input type="checkbox" data-en="'+i+'" '+(m.enabled!==false?'checked':'')+'><i></i></label></div></div>';
+  });
+  $('main').innerHTML = h;
+}
+
+function renderEditor(){
+  var m = editing, t = m.trigger;
+  setView('edit', isNew ? 'Nova macro' : 'Editar macro');
+  var h = '<div class="card"><label style="margin-top:0">Nome da macro</label><input id="fName" value="'+esc(m.name)+'" placeholder="Ex.: Modo carro">' +
+    '<label>Quando (gatilho)</label><select id="fTrig">' +
+    Object.keys(TRIGGERS).map(function(k){ return '<option value="'+k+'"'+(t.type===k?' selected':'')+'>'+TRIGGERS[k][0]+'</option>'; }).join('') + '</select>';
+  if (t.type==='time'){
+    h += '<label>Horário</label><input id="fTime" type="time" value="'+pad(t.hour||0)+':'+pad(t.minute||0)+'">' +
+      '<label>Dias da semana (nenhum marcado = todos)</label><div class="days">' +
+      DAYS.map(function(d){ return '<label><input type="checkbox" class="fDay" value="'+d[0]+'"'+((t.days||[]).indexOf(d[0])>=0?' checked':'')+'>'+d[1]+'</label>'; }).join('') + '</div>';
+  } else if (t.type==='battery_below'){
+    h += '<label>Nível da bateria (%)</label><input id="fLevel" type="number" min="1" max="99" value="'+(t.level||20)+'">';
+  } else if (t.type==='bt_on' || t.type==='bt_off'){
+    h += '<label>Nome do dispositivo (opcional, vazio = qualquer)</label><input id="fDevice" value="'+esc(t.device||'')+'" placeholder="Ex.: Carro, Fone JBL">';
+  } else if (t.type==='wifi_on' || t.type==='wifi_off'){
+    h += '<div class="sub" style="margin-top:8px">Dispara quando o celular conecta/desconecta de qualquer rede Wi-Fi.</div>';
+  }
+  h += '</div><div class="card"><div class="title">Então faça (em ordem)</div>';
+  if (!m.actions.length) h += '<div class="sub" style="margin:8px 0">Nenhuma ação. Adicione abaixo.</div>';
+  m.actions.forEach(function(a,i){ h += actionForm(a,i); });
+  h += '<label>Adicionar ação</label><select id="fAdd"><option value="">Escolha...</option>' +
+    Object.keys(ACTIONS).map(function(k){ return '<option value="'+k+'">'+ACTIONS[k]+'</option>'; }).join('') + '</select></div>' +
+    '<div class="row"><button class="btn grow" id="bSave">Salvar</button>' + (isNew?'':'<button class="btn red" id="bDel">Excluir</button>') + '</div>';
+  $('main').innerHTML = h;
+}
+
+function actionForm(a,i){
+  var h = '<div class="act" data-i="'+i+'"><div class="row"><div class="grow title">'+(ACTIONS[a.type]||a.type)+'</div>' +
+    '<button class="btn sec sm" data-mv="'+i+'" data-d="-1">&uarr;</button><button class="btn sec sm" data-mv="'+i+'" data-d="1">&darr;</button>' +
+    '<button class="btn red sm" data-rm="'+i+'">&times;</button></div>';
+  var f = function(k,label,type,ph){ return '<label>'+label+'</label><input data-k="'+k+'" type="'+(type||'text')+'" value="'+esc(a[k])+'" placeholder="'+(ph||'')+'">'; };
+  switch(a.type){
+    case 'notify': h += f('title','Título') + f('text','Texto'); break;
+    case 'open_app': h += '<label>App</label><button class="btn sec" data-pick="'+i+'">'+esc(a.label||'Escolher app...')+'</button>'; break;
+    case 'open_url': h += f('url','Endereço','text','https://...'); break;
+    case 'sms': h += f('number','Número','tel','+55 62 9...') + f('text','Mensagem') + '<div class="sub">Precisa da permissão de SMS (tela Permissões).</div>'; break;
+    case 'vibrate': h += f('ms','Duração (milissegundos)','number'); break;
+    case 'flashlight': h += sel(a,'mode','Ação',[['on','Ligar'],['off','Desligar'],['toggle','Alternar']]); break;
+    case 'ringer': h += sel(a,'mode','Modo',[['normal','Normal'],['vibrate','Vibrar'],['silent','Silencioso']]) + '<div class="sub">Silencioso total pode exigir acesso a &ldquo;Não perturbe&rdquo;.</div>'; break;
+    case 'settings': h += sel(a,'target','Abrir',[['wifi','Painel de Wi-Fi'],['bluetooth','Configurações de Bluetooth']]) + '<div class="sub">O Android moderno n&atilde;o deixa apps ligarem/desligarem Wi-Fi sozinhos. O painel abre para voc&ecirc; (ou use toques gravados).</div>'; break;
+    case 'wait': h += '<label>Segundos</label><input data-k="ms" data-mult="1000" type="number" min="0" value="'+((a.ms||1000)/1000)+'">'; break;
+    case 'taps': h += '<div class="sub">'+(a.strokes||[]).length+' toque(s) gravado(s)</div><div class="row" style="margin-top:6px"><button class="btn sec sm" data-rec="'+i+'">&#9210; Gravar toques</button>' +
+      ((a.strokes||[]).length?'<button class="btn red sm" data-clr="'+i+'">Limpar</button>':'') + '</div>'; break;
+  }
+  return h + '</div>';
+}
+function sel(a,k,label,opts){
+  return '<label>'+label+'</label><select data-k="'+k+'">'+opts.map(function(o){ return '<option value="'+o[0]+'"'+((a[k]||opts[0][0])===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select>';
+}
+
+// lê os campos da tela para o objeto em edição
+function collect(){
+  if (view!=='edit' || !editing) return;
+  var n = $('fName'); if (n) editing.name = n.value.trim();
+  var t = editing.trigger;
+  if (t.type==='time' && $('fTime')){
+    var p = ($('fTime').value||'08:00').split(':'); t.hour = +p[0]; t.minute = +p[1];
+    t.days = [].slice.call(document.querySelectorAll('.fDay:checked')).map(function(c){ return +c.value; });
+  }
+  if ($('fLevel')) t.level = Math.max(1, Math.min(99, +$('fLevel').value || 20));
+  if ($('fDevice')) t.device = $('fDevice').value.trim();
+  [].forEach.call(document.querySelectorAll('.act'), function(box){
+    var a = editing.actions[+box.getAttribute('data-i')]; if(!a) return;
+    [].forEach.call(box.querySelectorAll('[data-k]'), function(inp){
+      var k = inp.getAttribute('data-k'), v = inp.value;
+      if (inp.type==='number'){ v = +v || 0; if (inp.getAttribute('data-mult')) v = v * (+inp.getAttribute('data-mult')); }
+      a[k] = v;
+    });
+  });
+}
+
+function newMacro(){ return {id:uid(), name:'', enabled:true, trigger:{type:'charger_on'}, actions:[]}; }
+function defaultAction(type){
+  var a = {type:type};
+  if (type==='notify'){ a.title='MyMacro'; a.text=''; }
+  if (type==='vibrate') a.ms = 500;
+  if (type==='wait') a.ms = 1000;
+  if (type==='flashlight') a.mode = 'toggle';
+  if (type==='ringer') a.mode = 'vibrate';
+  if (type==='settings') a.target = 'wifi';
+  if (type==='taps') a.strokes = [];
+  return a;
+}
+
+async function pickApp(i){
+  var apps = [];
+  try { apps = JSON.parse((await Macro.listApps()).json); } catch(e){ toast('Não consegui listar os apps.'); return; }
+  var body = $('modalBody');
+  body.innerHTML = '<input id="appQ" placeholder="Buscar app..." style="margin:0 0 8px"><div id="appL"></div>';
+  var draw = function(){
+    var q = $('appQ').value.toLowerCase();
+    $('appL').innerHTML = apps.filter(function(a){ return a.name.toLowerCase().indexOf(q)>=0; }).map(function(a){
+      return '<div class="app" data-pkg="'+esc(a.pkg)+'" data-nm="'+esc(a.name)+'">'+esc(a.name)+'<div class="sub">'+esc(a.pkg)+'</div></div>'; }).join('') || '<div class="sub">Nada encontrado.</div>';
+  };
+  $('modal').classList.remove('hide'); draw();
+  $('appQ').oninput = draw;
+  $('appL').onclick = function(ev){
+    var el = ev.target.closest('.app'); if(!el) return;
+    editing.actions[i].pkg = el.getAttribute('data-pkg'); editing.actions[i].label = el.getAttribute('data-nm');
+    $('modal').classList.add('hide'); collect(); renderEditor();
+  };
+}
+$('modal').onclick = function(e){ if(e.target===$('modal')) $('modal').classList.add('hide'); };
+
+async function showPerms(){
+  setView('perm','Permissões');
+  var s = {};
+  try { s = await Macro.getStatus(); } catch(e){}
+  var row = function(ok,title,desc,btn,what){
+    return '<div class="card"><div class="row"><div class="grow"><div class="title">'+(ok?'<span class="ok">&#10003;</span> ':'<span class="no">&#9679;</span> ')+title+'</div><div class="sub">'+desc+'</div></div>' +
+      (ok?'':'<button class="btn sm" data-perm="'+what+'">'+btn+'</button>')+'</div></div>';
+  };
+  $('main').innerHTML =
+    '<div class="sub" style="margin-bottom:10px">Cada recurso abaixo s&oacute; &eacute; necess&aacute;rio se voc&ecirc; usar a fun&ccedil;&atilde;o correspondente.</div>' +
+    row(s.notifications,'Notificações','Para mostrar alertas das macros e manter o app ativo.','Permitir','ask') +
+    row(s.battery,'Sem economia de bateria','Evita o Android &ldquo;matar&rdquo; o MyMacro em segundo plano. Recomendado.','Ajustar','battery') +
+    row(s.overlay,'Exibir sobre outros apps','Necess&aacute;rio para gravar toques e para abrir apps a partir de uma macro.','Abrir','overlay') +
+    row(s.accessibility,'Serviço de Acessibilidade','Necess&aacute;rio para repetir toques gravados. Em Configura&ccedil;&otilde;es &rarr; Acessibilidade &rarr; MyMacro, ative.','Abrir','accessibility') +
+    row(s.sms,'Enviar SMS','S&oacute; para a a&ccedil;&atilde;o &ldquo;Enviar SMS&rdquo;.','Permitir','ask') +
+    row(s.bluetooth,'Bluetooth','Para saber o nome do dispositivo conectado.','Permitir','ask') +
+    '<div class="card"><div class="title">'+(s.service?'<span class="ok">&#10003;</span> Servi&ccedil;o ativo':'<span class="no">&#9679;</span> Servi&ccedil;o parado')+'</div><div class="sub">O MyMacro mant&eacute;m uma notifica&ccedil;&atilde;o fixa discreta enquanto observa os gatilhos.</div></div>' +
+    '<button class="btn sec" data-perm="app">Configura&ccedil;&otilde;es do app no Android</button>';
+}
+
+async function showLog(){
+  setView('log','Histórico');
+  var l = [];
+  try { l = JSON.parse((await Macro.getLog()).json || '[]'); } catch(e){}
+  var h = '<div class="row" style="margin-bottom:10px"><div class="grow sub">&Uacute;ltimos eventos e execu&ccedil;&otilde;es</div><button class="btn sec sm" id="bClr">Limpar</button></div>';
+  h += l.length ? l.map(function(x){ var d = new Date(x.t); return '<div class="card" style="padding:10px"><div class="sub">'+d.toLocaleString('pt-BR')+'</div>'+esc(x.m)+'</div>'; }).join('') : '<div class="empty">Nada registrado ainda.</div>';
+  $('main').innerHTML = h;
+}
+
+document.addEventListener('click', async function(ev){
+  var t = ev.target.closest('button,[data-edit]'); if(!t) return;
+  var d = t.dataset;
+  if (d.edit !== undefined){ editing = JSON.parse(JSON.stringify(macros[+d.edit])); isNew = false; renderEditor(); return; }
+  if (d.run !== undefined){ try { await Macro.runMacro({id: macros[+d.run].id}); toast('Macro executada. Veja o Histórico.'); } catch(e){ toast(e.message || 'Erro'); } return; }
+  if (d.mv !== undefined){ collect(); var i=+d.mv, j=i+(+d.d); if(j>=0&&j<editing.actions.length){ var x=editing.actions[i]; editing.actions[i]=editing.actions[j]; editing.actions[j]=x; } renderEditor(); return; }
+  if (d.rm !== undefined){ collect(); editing.actions.splice(+d.rm,1); renderEditor(); return; }
+  if (d.pick !== undefined){ collect(); pickApp(+d.pick); return; }
+  if (d.clr !== undefined){ collect(); editing.actions[+d.clr].strokes = []; renderEditor(); return; }
+  if (d.rec !== undefined){
+    collect(); recordIdx = +d.rec;
+    try { localStorage.setItem('draft', JSON.stringify({m:editing,isNew:isNew,idx:recordIdx})); } catch(e){}
+    try { await Macro.startRecording(); toast('Gravando: toque na tela normalmente e use PARAR GRAVACAO ao terminar.'); }
+    catch(e){ toast(e.message || 'Não foi possível gravar.'); }
+    return;
+  }
+  if (d.perm){
+    try { if (d.perm==='ask') await Macro.askPermissions(); else await Macro.openSettings({what:d.perm}); } catch(e){}
+    setTimeout(showPerms, 1500); return;
+  }
+  if (t.id==='bSave'){
+    collect();
+    if (!editing.name) editing.name = trigText(editing.trigger);
+    var k = macros.findIndex(function(m){ return m.id===editing.id; });
+    if (k>=0) macros[k] = editing; else macros.push(editing);
+    await persist(); toast('Macro salva.'); renderList(); return;
+  }
+  if (t.id==='bDel'){
+    if (!confirm('Excluir esta macro?')) return;
+    macros = macros.filter(function(m){ return m.id!==editing.id; });
+    await persist(); renderList(); return;
+  }
+  if (t.id==='fab'){ editing = newMacro(); isNew = true; renderEditor(); return; }
+  if (t.id==='back'){ renderList(); return; }
+  if (t.id==='bPerm'){ showPerms(); return; }
+  if (t.id==='bLog'){ showLog(); return; }
+  if (t.id==='bClr'){ await Macro.clearLog(); showLog(); return; }
+});
+document.addEventListener('change', async function(ev){
+  var e = ev.target;
+  if (e.id==='fTrig'){ collect(); editing.trigger = {type:e.value}; if(e.value==='time'){editing.trigger.hour=8;editing.trigger.minute=0;editing.trigger.days=[];} if(e.value==='battery_below') editing.trigger.level=20; renderEditor(); return; }
+  if (e.id==='fAdd' && e.value){ collect(); editing.actions.push(defaultAction(e.value)); renderEditor(); return; }
+  if (e.getAttribute && e.getAttribute('data-en') !== null){
+    var m = macros[+e.getAttribute('data-en')]; m.enabled = e.checked; await persist(); toast(m.enabled?'Macro ativada':'Macro desativada');
+  }
+});
+
+Macro.addListener('recorded', function(d){
+  var strokes = []; try { strokes = JSON.parse(d.strokes || '[]'); } catch(e){}
+  if (!editing){
+    try { var dr = JSON.parse(localStorage.getItem('draft')||'null'); if (dr){ editing = dr.m; isNew = dr.isNew; recordIdx = dr.idx; } } catch(e){}
+  }
+  if (editing && editing.actions[recordIdx]){
+    editing.actions[recordIdx].strokes = strokes;
+    renderEditor();
+    toast(strokes.length + ' toque(s) gravado(s). Toque em Salvar.');
+  }
+});
+
+document.addEventListener('visibilitychange', function(){ if(!document.hidden && view==='perm') showPerms(); });
+
+loadAll().then(renderList);
+})();
+</script>
+</body>
+</html>
