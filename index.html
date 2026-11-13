@@ -50,16 +50,19 @@ label{display:block;font-size:13px;color:var(--mut);margin-top:10px}
 <body>
 <header>
   <button id="back" class="hide">&larr;</button>
-  <h1 id="ttl">MyMacro</h1>
+  <h1 id="ttl">MyMacro</h1><span style="font-size:11px;opacity:.7">v2</span>
   <button id="bPerm">Permiss&otilde;es</button>
   <button id="bLog">Hist&oacute;rico</button>
 </header>
+<div id="err" class="hide" style="background:#d93a3a;color:#fff;padding:10px 14px;font-size:13px;word-break:break-word"></div>
 <main id="main"></main>
 <button class="btn fab" id="fab">+ Nova macro</button>
 <div id="toast" class="toast hide"></div>
 <div id="modal" class="modal hide"><div id="modalBody"></div></div>
 
 <script>
+window.addEventListener('error',function(e){var b=document.getElementById('err');if(b){b.classList.remove('hide');b.textContent='Erro: '+(e.message||e)+' ('+(e.lineno||'?')+')';}});
+window.addEventListener('unhandledrejection',function(e){var b=document.getElementById('err');if(b){b.classList.remove('hide');b.textContent='Erro: '+((e.reason&&e.reason.message)||e.reason);}});
 (function(){
 'use strict';
 var NATIVE = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
@@ -81,6 +84,7 @@ else {
   };
 }
 
+function T(p,ms){ return Promise.race([p, new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('O Android não respondeu (tempo esgotado).')); }, ms||4000); })]); }
 var TRIGGERS = {
   time:['Em um horário'], charger_on:['Carregador conectado'], charger_off:['Carregador desconectado'],
   battery_below:['Bateria abaixo de um nível'], wifi_on:['Wi-Fi conectado'], wifi_off:['Wi-Fi desconectado'],
@@ -101,10 +105,10 @@ function toast(t){ var e=$('toast'); e.textContent=t; e.classList.remove('hide')
 function pad(n){ return (n<10?'0':'')+n; }
 
 async function loadAll(){
-  try { var r = await Macro.loadMacros(); macros = JSON.parse(r.json || '[]'); } catch(e){ macros = []; }
+  try { var r = await T(Macro.loadMacros()); macros = JSON.parse(r.json || '[]'); } catch(e){ macros = []; }
 }
 async function persist(){
-  try { await Macro.saveMacros({json: JSON.stringify(macros)}); } catch(e){ toast('Erro ao salvar: ' + e.message); }
+  try { await T(Macro.saveMacros({json: JSON.stringify(macros)})); } catch(e){ toast('Erro ao salvar: ' + e.message); }
 }
 
 function trigText(t){
@@ -241,7 +245,7 @@ function defaultAction(type){
 
 async function pickApp(i){
   var apps = [];
-  try { apps = JSON.parse((await Macro.listApps()).json); } catch(e){ toast('Não consegui listar os apps.'); return; }
+  try { apps = JSON.parse((await T(Macro.listApps(),8000)).json); } catch(e){ toast('Não consegui listar os apps.'); return; }
   var body = $('modalBody');
   body.innerHTML = '<input id="appQ" placeholder="Buscar app..." style="margin:0 0 8px"><div id="appL"></div>';
   var draw = function(){
@@ -262,7 +266,7 @@ $('modal').onclick = function(e){ if(e.target===$('modal')) $('modal').classList
 async function showPerms(){
   setView('perm','Permissões');
   var s = {};
-  try { s = await Macro.getStatus(); } catch(e){}
+  try { s = await T(Macro.getStatus()); } catch(e){}
   var row = function(ok,title,desc,btn,what){
     return '<div class="card"><div class="row"><div class="grow"><div class="title">'+(ok?'<span class="ok">&#10003;</span> ':'<span class="no">&#9679;</span> ')+title+'</div><div class="sub">'+desc+'</div></div>' +
       (ok?'':'<button class="btn sm" data-perm="'+what+'">'+btn+'</button>')+'</div></div>';
@@ -282,7 +286,7 @@ async function showPerms(){
 async function showLog(){
   setView('log','Histórico');
   var l = [];
-  try { l = JSON.parse((await Macro.getLog()).json || '[]'); } catch(e){}
+  try { l = JSON.parse((await T(Macro.getLog())).json || '[]'); } catch(e){}
   var h = '<div class="row" style="margin-bottom:10px"><div class="grow sub">&Uacute;ltimos eventos e execu&ccedil;&otilde;es</div><button class="btn sec sm" id="bClr">Limpar</button></div>';
   h += l.length ? l.map(function(x){ var d = new Date(x.t); return '<div class="card" style="padding:10px"><div class="sub">'+d.toLocaleString('pt-BR')+'</div>'+esc(x.m)+'</div>'; }).join('') : '<div class="empty">Nada registrado ainda.</div>';
   $('main').innerHTML = h;
@@ -335,7 +339,7 @@ document.addEventListener('change', async function(ev){
   }
 });
 
-Macro.addListener('recorded', function(d){
+try { Macro.addListener('recorded', function(d){
   var strokes = []; try { strokes = JSON.parse(d.strokes || '[]'); } catch(e){}
   if (!editing){
     try { var dr = JSON.parse(localStorage.getItem('draft')||'null'); if (dr){ editing = dr.m; isNew = dr.isNew; recordIdx = dr.idx; } } catch(e){}
@@ -345,10 +349,11 @@ Macro.addListener('recorded', function(d){
     renderEditor();
     toast(strokes.length + ' toque(s) gravado(s). Toque em Salvar.');
   }
-});
+}); } catch(e){}
 
 document.addEventListener('visibilitychange', function(){ if(!document.hidden && view==='perm') showPerms(); });
 
+renderList();
 loadAll().then(renderList);
 })();
 </script>
