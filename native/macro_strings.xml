@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="macro_accessibility_description">Permite que o MyMacro repita toques e deslizes na tela quando uma macro mandar. Ele nao le o conteudo da tela.</string>
+</resources>
