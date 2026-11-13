@@ -144,6 +144,15 @@ public class MacroPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void takeRecorded(PluginCall call) {
+        String v = MacroEngine.sp(getContext()).getString("recorded", "");
+        MacroEngine.sp(getContext()).edit().remove("recorded").apply();
+        JSObject o = new JSObject();
+        o.put("json", v);
+        call.resolve(o);
+    }
+
+    @PluginMethod
     public void startRecording(PluginCall call) {
         Context c = getContext();
         if (TapAccessibilityService.instance == null) { call.reject("Ative o servico de Acessibilidade do MyMacro primeiro."); return; }
@@ -161,9 +170,10 @@ public class MacroPlugin extends Plugin {
                     back.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                     try { cc.startActivity(back); } catch (Throwable e) { /* ignora */ }
                 }
+                MacroEngine.sp(cc).edit().putString("recorded", strokes.toString()).apply();
                 JSObject o = new JSObject();
                 o.put("strokes", strokes.toString());
-                notifyListeners("recorded", o, true);
+                try { notifyListeners("recorded", o, true); } catch (Throwable e) { /* ignora */ }
             }
         });
         call.resolve();
